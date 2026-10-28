@@ -1,7 +1,7 @@
 [package]
 name = "nodectl"
 default-run = "nodectl"
-version = "0.6.2"
+version = "0.6.3"
 edition = "2024"
 rust-version = "1.99.1"
 repository = "https://github.com/reina0721/dmit-node-config"

@@ -20,10 +20,15 @@ fn command(program: &str, args: &[&str]) -> Result<Vec<u8>> {
             .filter_map(|key| std::env::var_os(key).map(|value| (key, value))),
         )
         .output()?;
-    ensure!(
-        output.status.success(),
-        "Artifact tool failed: {program}; output withheld"
-    );
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let detail = stderr.trim();
+        if detail.is_empty() {
+            bail!("Artifact tool failed: {program}; exit code: {:?}", output.status.code());
+        } else {
+            bail!("Artifact tool failed: {program}: {detail}");
+        }
+    }
     Ok(output.stdout)
 }
 
@@ -217,13 +222,17 @@ pub fn download_xray(output: &Path) -> Result<()> {
             "--disable",
             "--proto",
             "=https",
+            "--proto-redir",
+            "=https",
             "--tlsv1.2",
             "--fail",
             "--location",
             "--silent",
             "--show-error",
+            "--connect-timeout",
+            "20",
             "--max-time",
-            "180",
+            "600",
             "-o",
             archive.to_str().context("archive path")?,
             url,

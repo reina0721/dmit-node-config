@@ -609,9 +609,11 @@ pub fn encryption_keys(c: &Config, s: &mut Secrets) -> Result<()> {
         return Ok(());
     }
     let version = super::host::command(&c.runtime.xray_binary, &["version"])?;
+    let lock: toml::Value = toml::from_str(include_str!("../versions.lock.toml"))?;
+    let expected = lock["xray"]["version"].as_str().unwrap_or("26.10.21");
     ensure!(
-        version.split_whitespace().any(|v| v == "26.10.10"),
-        "Encryption key generation requires locked Xray 26.10.10"
+        version.split_whitespace().any(|v| v == expected || v == "26.10.10"),
+        "Encryption key generation requires locked Xray {expected}"
     );
     let pair = || -> Result<EncryptionPair> {
         let output = super::host::command(&c.runtime.xray_binary, &["vlessenc"])?;

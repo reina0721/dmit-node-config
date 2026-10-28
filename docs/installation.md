@@ -8,15 +8,15 @@
 
 资产缺失、版本过旧或验证失败即停止，不回退到未签名资产、源码编译或手动上传。不提供跳过验签参数。新程序原子安装，原程序按摘要保存在 `/usr/local/lib/nodectl/versions/`；未恢复事务会阻止替换。
 
-在已下载的同一脚本后添加 `--version v0.6.2` 可固定版本；`--token-file /root/cf-token` 把受保护凭据文件交给 Rust 向导，不把 Token 真值放入 argv。
+在已下载的同一脚本后添加 `--version v0.6.3` 可固定版本；`--token-file /root/cf-token` 把受保护凭据文件交给 Rust 向导，不把 Token 真值放入 argv。
 
 ## 只安装或升级 nodectl
 
 此模式不调用部署、不操作服务，适合已有自动化链路：
 
 ```sh
-sh dmitserverconfig-setup.sh --install-only --version v0.6.2 --dry-run
-sudo sh dmitserverconfig-setup.sh --install-only --version v0.6.2 --execute
+sh dmitserverconfig-setup.sh --install-only --version v0.6.3 --dry-run
+sudo sh dmitserverconfig-setup.sh --install-only --version v0.6.3 --execute
 ```
 
 原有明确指定 `--execute/--dry-run` 的命令保留工具安装语义。`nodectl upgrade` 也调用工具安装模式，避免递归进入向导。固定版本的 dry-run 不下载或创建文件；未固定版本时只会查询最新版本元数据。
@@ -27,7 +27,7 @@ sudo sh dmitserverconfig-setup.sh --install-only --version v0.6.2 --execute
 
 默认直接使用 GitHub HTTPS，支持标准 `http_proxy/https_proxy/ALL_PROXY/NO_PROXY` 及自定义 CA 环境变量；不会自动选用第三方镜像，也不输出含认证信息的代理值。
 
-`--bundle-dir /root/offline --version v0.6.2` 从本地目录读取对应架构归档、SHA256SUMS 和 Sigstore bundle；仍然验签。需在 PATH 或该目录提供固定摘要的官方 `cosign-linux-amd64` / `cosign-linux-arm64`。该选项仅让程序资产离线；系统软件、DNS、CA 和 WARP 的网络需求仍需另行满足，不能宣称整套部署离线。
+`--bundle-dir /root/offline --version v0.6.3` 从本地目录读取对应架构归档、SHA256SUMS 和 Sigstore bundle；仍然验签。需在 PATH 或该目录提供固定摘要的官方 `cosign-linux-amd64` / `cosign-linux-arm64`。该选项仅让程序资产离线；系统软件、DNS、CA 和 WARP 的网络需求仍需另行满足，不能宣称整套部署离线。
 
 ## 发布与源码
 
