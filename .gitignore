@@ -24,4 +24,5 @@
 /webui/out/
 /webui/.next/
 /webui/test-results/
-
+tmp
+node_modules

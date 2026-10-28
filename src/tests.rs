@@ -13,6 +13,8 @@ fn fixture() -> (Config, Secrets) {
             let mut c: Config = toml::from_str(config::EXAMPLE).unwrap();
             c.vless = None;
             c.distribution = None;
+            c.cn_warp = None;
+            c.web_services = None;
             c
         },
         Secrets {

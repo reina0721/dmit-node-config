@@ -385,32 +385,51 @@ fn record_changes(name: &str, records: &[Value], c: &Config) -> Result<Vec<Chang
 
 pub fn verify(c: &Config) -> Result<()> {
     #[cfg(not(feature = "integration-test"))]
-    let resolver = vec!["@1.1.1.1".to_owned()];
+    let resolvers: Vec<Vec<String>> = vec![
+        vec!["@1.1.1.1".to_owned()],
+        vec!["@8.8.8.8".to_owned()],
+        vec![],
+    ];
     #[cfg(feature = "integration-test")]
-    let resolver = if std::env::var("NODECTL_TEST_DNS").as_deref() == Ok("yes") {
-        vec!["@127.0.0.1".to_owned(), "-p".into(), "1053".into()]
+    let resolvers: Vec<Vec<String>> = if std::env::var("NODECTL_TEST_DNS").as_deref() == Ok("yes") {
+        vec![vec!["@127.0.0.1".to_owned(), "-p".into(), "1053".into()]]
     } else {
-        vec!["@1.1.1.1".into()]
+        vec![vec!["@1.1.1.1".into()]]
     };
     for name in c.domains() {
         for (kind, wanted) in [("A", c.node.ipv4.as_str()), ("AAAA", c.node.ipv6.as_str())] {
-            let mut query = vec!["+short", "+time=3", "+tries=1", kind, name.as_str()];
-            query.extend(resolver.iter().map(String::as_str));
-            let result = host::command("dig", &query)?;
-            let actual = result
-                .lines()
-                .filter(|l| !l.trim().is_empty())
-                .map(|l| l.parse::<std::net::IpAddr>())
-                .collect::<std::result::Result<Vec<_>, _>>()
-                .context("DNS returned a CNAME or invalid address")?;
-            let expected = if wanted.is_empty() {
-                vec![]
-            } else {
-                vec![wanted.parse::<std::net::IpAddr>()?]
-            };
+            if wanted.is_empty() {
+                continue;
+            }
+            let expected = vec![wanted.parse::<std::net::IpAddr>()?];
+            let mut verified = false;
+            let mut last_err = None;
+            for resolver in &resolvers {
+                let mut query = vec!["+short", "+time=3", "+tries=2", kind, name.as_str()];
+                query.extend(resolver.iter().map(String::as_str));
+                if let Ok(result) = host::command("dig", &query) {
+                    if let Ok(actual) = result
+                        .lines()
+                        .filter(|l| !l.trim().is_empty())
+                        .map(|l| l.parse::<std::net::IpAddr>())
+                        .collect::<std::result::Result<Vec<_>, _>>()
+                    {
+                        if actual == expected {
+                            verified = true;
+                            break;
+                        } else if !actual.is_empty() {
+                            last_err = Some(anyhow::anyhow!(
+                                "Public DNS {kind} for {name} returned {actual:?}, expected {expected:?}"
+                            ));
+                        }
+                    }
+                }
+            }
             ensure!(
-                actual == expected,
-                "Public DNS {kind} for {name} does not match; wait for propagation or resolve conflicting records"
+                verified,
+                last_err.unwrap_or_else(|| anyhow::anyhow!(
+                    "Public DNS {kind} for {name} does not match {wanted}; wait for propagation or resolve conflicting records"
+                ))
             );
         }
     }
@@ -418,13 +437,27 @@ pub fn verify(c: &Config) -> Result<()> {
 }
 pub fn wait(c: &Config, seconds: u64) -> Result<()> {
     let start = std::time::Instant::now();
+    let mut last_log = std::time::Instant::now();
+    println!("Waiting for public DNS propagation (up to {seconds}s)...");
     loop {
         match verify(c) {
-            Ok(()) => return Ok(()),
-            Err(error) if start.elapsed().as_secs() >= seconds => return Err(error),
-            Err(_) => {
-                if start.elapsed().as_secs() < 5 {
-                    println!("Waiting for public DNS propagation (up to {seconds}s)");
+            Ok(()) => {
+                println!("Public DNS propagation confirmed for all domains");
+                return Ok(());
+            }
+            Err(error) if start.elapsed().as_secs() >= seconds => {
+                eprintln!("DNS propagation timed out after {seconds}s: {error:#}");
+                return Err(error);
+            }
+            Err(error) => {
+                if last_log.elapsed().as_secs() >= 15 {
+                    println!(
+                        "Still waiting for DNS propagation ({}/{}s): {}",
+                        start.elapsed().as_secs(),
+                        seconds,
+                        error
+                    );
+                    last_log = std::time::Instant::now();
                 }
                 std::thread::sleep(std::time::Duration::from_secs(5));
             }

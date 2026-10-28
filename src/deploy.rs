@@ -96,6 +96,9 @@ pub struct Deploy {
     /// Wait for public A/AAAA propagation before failing and restoring DNS.
     #[arg(long,default_value_t=300,value_parser=clap::value_parser!(u64).range(1..=900))]
     pub dns_wait_seconds: u64,
+    /// Delete newly created DNS records on deployment failure (defaults to retaining them for retry).
+    #[arg(long)]
+    pub delete_dns_on_failure: bool,
     /// Execute only the exact preview with this digest.
     #[arg(long)]
     pub approve: Option<String>,
@@ -1044,7 +1047,7 @@ pub fn run(store: &Store, mut args: Deploy) -> Result<()> {
             }
         }
         if args.wizard && crate::cn_warp::needs_registration(&c) {
-            args.accept_warp_terms = prompt("Accept Cloudflare WARP terms https://www.cloudflare.com/application/terms/ (true/false)", "false")?.parse()?;
+            args.accept_warp_terms = prompt("Accept Cloudflare WARP terms https://www.cloudflare.com/application/terms/ (true/false)", "true")?.parse()?;
         }
         if args.wizard
             && store.pointer("current")?.is_none()
@@ -1164,7 +1167,7 @@ pub fn run(store: &Store, mut args: Deploy) -> Result<()> {
     } else {
         "New DMIT configuration; credentials generated on execution".into()
     };
-    let mut plan = json!({"schema_version":1,"configuration_diff":configuration_diff,"required_actions":required_actions,"certificate_status":{"domain_valid":domain_cert_valid,"ip_valid":ip_cert_valid},"configuration":c,"preserve_existing_secrets":exists,"generate_transport_paths":!exists && args.input.is_none(),"previous_client_compatibility":if previous.is_none(){"no_previous_managed_release"}else if preserve_clients{"preserved_and_live_test_required"}else{"explicit_input_changes_require_client_updates"},"secret_digest":if exists{Some(store::digest(&serde_json::to_vec(&s)?))}else{None},"inventory":inventory,"dns_changes":changes,"manual_dns":cf.is_none(),"manual_certificates":args.manual_certificates,"provision_dependencies":!args.skip_dependencies,"takeover":args.takeover,"new_package_defaults_may_be_claimed":entrypoints_absent && !args.skip_dependencies,"probe_url":args.probe_url,"dns_wait_seconds":args.dns_wait_seconds,"acme_email":args.acme_email,"acme_discover_zones":args.acme_discover_zones,"retire_superseded_acme_renewal":if args.manual_certificates{None}else{superseded_acme.as_deref()},"accept_ca_terms":args.accept_ca_terms,"accept_warp_terms":args.accept_warp_terms,"generator":env!("CARGO_PKG_VERSION"),"executable_sha256":store::file_digest(&std::env::current_exe()?)?,"versions_lock_sha256":store::digest(include_bytes!("../versions.lock.toml")),"stages":["backup","dependencies","inputs","dns","certificates","warp","warp-socks-handshake-with-temporary-tun-stop","render","diff","check","takeover-if-authorized","apply-with-live-handshakes","renewal"],"recovery_limits":["Package transactions and CA issuance cannot be undone by a configuration rollback; backups and DNS recovery are retained","Unknown unmanaged service credentials are never inferred: import verified node.toml/secrets.json before takeover"]});
+    let mut plan = json!({"schema_version":1,"configuration_diff":configuration_diff,"required_actions":required_actions,"certificate_status":{"domain_valid":domain_cert_valid,"ip_valid":ip_cert_valid},"configuration":c,"preserve_existing_secrets":exists,"generate_transport_paths":!exists && args.input.is_none(),"previous_client_compatibility":if previous.is_none(){"no_previous_managed_release"}else if preserve_clients{"preserved_and_live_test_required"}else{"explicit_input_changes_require_client_updates"},"secret_digest":if exists{Some(store::digest(&serde_json::to_vec(&s)?))}else{None},"inventory":inventory,"dns_changes":changes,"manual_dns":cf.is_none(),"manual_certificates":args.manual_certificates,"provision_dependencies":!args.skip_dependencies,"takeover":args.takeover,"new_package_defaults_may_be_claimed":entrypoints_absent && !args.skip_dependencies,"probe_url":args.probe_url,"dns_wait_seconds":args.dns_wait_seconds,"delete_dns_on_failure":args.delete_dns_on_failure,"acme_email":args.acme_email,"acme_discover_zones":args.acme_discover_zones,"retire_superseded_acme_renewal":if args.manual_certificates{None}else{superseded_acme.as_deref()},"accept_ca_terms":args.accept_ca_terms,"accept_warp_terms":args.accept_warp_terms,"generator":env!("CARGO_PKG_VERSION"),"executable_sha256":store::file_digest(&std::env::current_exe()?)?,"versions_lock_sha256":store::digest(include_bytes!("../versions.lock.toml")),"stages":["backup","dependencies","inputs","dns","certificates","warp","warp-socks-handshake-with-temporary-tun-stop","render","diff","check","takeover-if-authorized","apply-with-live-handshakes","renewal"],"recovery_limits":["Package transactions and CA issuance cannot be undone by a configuration rollback; backups and DNS recovery are retained","Unknown unmanaged service credentials are never inferred: import verified node.toml/secrets.json before takeover"]});
     plan["website_placeholder_replacement"] = json!(provision::website_change(&c)?);
     plan["generate_independent_vless_keys"] = json!(c.encrypted() && s.vless.is_none());
     plan["replace_domain_set"] = json!(args.replace_domain_set);
@@ -1547,7 +1550,7 @@ pub fn run(store: &Store, mut args: Deploy) -> Result<()> {
             }
         }
         // Service apply has its own transaction. Provisioning uses the saved journal.
-        match restore(store, &journal, cf.as_ref()) {
+        match restore(store, &journal, cf.as_ref(), args.delete_dns_on_failure) {
             Ok(()) => bail!(
                 "Deployment failed and saved host inputs were restored: {error:#}. Package/CA side effects remain recorded at {}",
                 backup.display()
@@ -1559,7 +1562,7 @@ pub fn run(store: &Store, mut args: Deploy) -> Result<()> {
     }
     Ok(())
 }
-fn restore(store: &Store, journal: &Journal, cf: Option<&Cloudflare>) -> Result<()> {
+fn restore(store: &Store, journal: &Journal, cf: Option<&Cloudflare>, delete_new_dns: bool) -> Result<()> {
     ensure!(
         journal
             .backup
@@ -1809,12 +1812,26 @@ fn restore(store: &Store, journal: &Journal, cf: Option<&Cloudflare>) -> Result<
     }
     restore_service_states(&journal.services)?;
     if let Some(change) = &journal.pending_dns {
-        cf.context("DNS recovery requires Cloudflare token")?
-            .restore_pending(change)?;
+        if change.before.is_some() || delete_new_dns {
+            cf.context("DNS recovery requires Cloudflare token")?
+                .restore_pending(change)?;
+        } else {
+            println!(
+                "Retaining pending newly created DNS record {} ({}) on Cloudflare",
+                change.name, change.kind
+            );
+        }
     }
     for (change, record) in journal.dns.iter().rev() {
-        cf.context("DNS recovery requires Cloudflare token")?
-            .restore(change, record)?;
+        if change.before.is_some() || delete_new_dns {
+            cf.context("DNS recovery requires Cloudflare token")?
+                .restore(change, record)?;
+        } else {
+            println!(
+                "Retaining newly created DNS record {} ({}) on Cloudflare to allow propagation and retry",
+                change.name, change.kind
+            );
+        }
     }
     release_new_cn_policy(
         journal.cn_policy.as_ref(),
@@ -1842,7 +1859,7 @@ pub fn recover(store: &Store, token_file: Option<&Path>) -> Result<()> {
     if journal.schema_version == 3
         && ["snapshot-pending", "restored", "committed"].contains(&journal.phase.as_str())
     {
-        return restore(store, &journal, None);
+        return restore(store, &journal, None, false);
     }
     let cf = if journal.pending_dns.is_some() || !journal.dns.is_empty() {
         Some(Cloudflare::new(
@@ -1852,7 +1869,7 @@ pub fn recover(store: &Store, token_file: Option<&Path>) -> Result<()> {
     } else {
         None
     };
-    restore(store, &journal, cf.as_ref())
+    restore(store, &journal, cf.as_ref(), false)
 }
 
 /// Roll back the entire automatic deployment, including certificate and DNS
@@ -1904,7 +1921,7 @@ pub fn rollback(store: &Store, token_file: Option<&Path>) -> Result<bool> {
         None
     };
     save(store, &journal)?;
-    restore(store, &journal, cf.as_ref())?;
+    restore(store, &journal, cf.as_ref(), false)?;
     println!("Deployment materials, previous release and DNS restored and verified.");
     Ok(true)
 }

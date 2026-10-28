@@ -27,7 +27,13 @@ pub struct Setup {
     #[arg(long, default_value = "/etc/ssl/dmit/ip")]
     pub ip_cert_dir: String,
     #[arg(long)]
-    pub warp: bool,
+    pub warp: Option<bool>,
+    #[arg(long)]
+    pub cn_warp: Option<bool>,
+    #[arg(long)]
+    pub web_services: Option<bool>,
+    #[arg(long)]
+    pub distribution: Option<bool>,
     #[arg(long)]
     pub non_interactive: bool,
     /// Without this flag, only show the proposed non-secret configuration.
@@ -72,7 +78,62 @@ pub fn run(store: &Store, setup: Setup) -> Result<()> {
     c.node.aliases = setup.aliases;
     c.tls.domain_cert_dir = setup.domain_cert_dir;
     c.tls.ip_cert_dir = setup.ip_cert_dir;
-    c.warp.enabled = setup.warp;
+    if let Some(v) = setup.warp {
+        c.warp.enabled = v;
+    }
+    if let Some(v) = setup.cn_warp {
+        c.cn_warp
+            .get_or_insert_with(|| config::CnWarp::managed(v))
+            .enabled = v;
+    }
+    if let Some(v) = setup.web_services {
+        c.web_services
+            .get_or_insert_with(|| config::WebServices::managed(v))
+            .enabled = v;
+    }
+    if let Some(v) = setup.distribution {
+        c.distribution = Some(config::Distribution { enabled: v });
+    }
+    if !setup.non_interactive {
+        let prompt_bool = |label: &str, current: bool| -> Result<bool> {
+            print!("{label} [{current}]: ");
+            io::stdout().flush()?;
+            let mut line = String::new();
+            if io::stdin().read_line(&mut line)? == 0 || line.trim().is_empty() {
+                Ok(current)
+            } else {
+                Ok(line.trim().parse()?)
+            }
+        };
+        if setup.warp.is_none() {
+            c.warp.enabled = prompt_bool("Independent WARP (true/false)", c.warp.enabled)?;
+        }
+        if setup.cn_warp.is_none() {
+            let enabled = prompt_bool(
+                "CN traffic via a second isolated WARP (true/false)",
+                c.routes_cn(),
+            )?;
+            c.cn_warp
+                .get_or_insert_with(|| config::CnWarp::managed(enabled))
+                .enabled = enabled;
+        }
+        if setup.web_services.is_none() {
+            let enabled = prompt_bool(
+                "Speedtest, LibreSpeed and OpenList websites (true/false)",
+                c.serves_web(),
+            )?;
+            c.web_services
+                .get_or_insert_with(|| config::WebServices::managed(enabled))
+                .enabled = enabled;
+        }
+        if setup.distribution.is_none() {
+            let enabled = prompt_bool(
+                "Protected node page and subscriptions (true/false)",
+                c.distributes(),
+            )?;
+            c.distribution = Some(config::Distribution { enabled });
+        }
+    }
     c.runtime.xray_binary = setup
         .xray_binary
         .to_str()

@@ -2,7 +2,9 @@
 
 一条命令，在 Debian / Ubuntu 上交互部署 Nginx、Xray Core 和可选 WARP。已有部署也使用同一入口更新，优先保留配置和密钥。服务原生运行，由 systemd 管理。
 
-当前版本：[v0.6.1](https://github.com/reina0721/dmit-node-config/releases/tag/v0.6.1)。
+当前版本：[v0.6.2](https://github.com/reina0721/dmit-node-config/releases/tag/v0.6.2)。
+
+v0.6.2 将 WARP、CN WARP 与 Web Services 调整为标准内置配置；优化 Cloudflare DNS 生命周期，部署失败回滚时默认保留已创建记录，避免反复创建被删；DNS 探测引入多解析器备用回退（1.1.1.1、8.8.8.8 与系统解析器）及周期等待反馈。
 
 v0.6.1 修复仓库所有者更名（`i0721` → `reina0721`）后安装器解析最新版本失败、一键安装直接退出的问题；签名验证锚定精确标签，只接受当前 `reina0721` 身份，v0.6.0 及更早归档请使用其发行时的安装器。功能与 v0.6.0 相同。
 

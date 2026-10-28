@@ -1,7 +1,7 @@
 schema_version = 1
-# Optional CN routing and website services are opt-in and absent in legacy
-# configurations. See docs/cn-warp-web-services.md for their shared model and
-# locked defaults; the deployment wizard collects these choices once.
+# DMIT node configuration with full standard WARP, CN WARP, and companion services.
+# Outbound traffic uses native DMIT routing by default, with China destinations
+# routed through an isolated CN WARP instance (table 5271, fwmark 5271).
 
 [node]
 # Tutorial names in docs/deployment.md; replace documentation IPs before apply.
@@ -66,3 +66,21 @@ take_over_default_route = false
 
 [distribution]
 enabled = true
+
+[cn_warp]
+enabled = true
+interface = "warp-cn"
+config_file = "/etc/usque-cn/config.json"
+routing_table = 5271
+rule_priority = 15271
+socket_mark = 5271
+geodata_dir = "/var/lib/nodectl-geodata/202610172205"
+
+[web_services]
+enabled = true
+librespeed_port = 8989
+openlist_port = 5244
+openlist_data_dir = "/var/lib/nodectl-openlist"
+openlist_files_dir = "/var/lib/nodectl-openlist-files"
+download_size_mib = 256
+
