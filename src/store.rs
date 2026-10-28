@@ -27,19 +27,28 @@ pub fn file_digest(path: &Path) -> Result<String> {
 }
 
 pub fn private_dir(path: &Path) -> Result<()> {
-    if path.exists() {
-        return check_private(path, true);
-    }
     #[cfg(unix)]
     {
-        use std::os::unix::fs::DirBuilderExt;
+        use std::os::unix::fs::{DirBuilderExt, MetadataExt, PermissionsExt};
+        if path.exists() {
+            let m = fs::symlink_metadata(path)?;
+            if m.is_dir() && m.mode() & 0o077 != 0 && m.uid() == unsafe { libc::geteuid() } {
+                fs::set_permissions(path, fs::Permissions::from_mode(0o700))?;
+            }
+            return check_private(path, true);
+        }
         fs::DirBuilder::new()
             .recursive(true)
             .mode(0o700)
             .create(path)?;
     }
     #[cfg(not(unix))]
-    fs::create_dir_all(path)?;
+    {
+        if path.exists() {
+            return check_private(path, true);
+        }
+        fs::create_dir_all(path)?;
+    }
     check_private(path, true)
 }
 
