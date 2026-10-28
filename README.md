@@ -2,7 +2,7 @@
 
 一条命令，在 Debian / Ubuntu 上交互部署 Nginx、Xray Core 和可选 WARP。已有部署也使用同一入口更新，优先保留配置和密钥。服务原生运行，由 systemd 管理。
 
-当前版本：[v0.6.0](https://github.com/i0721/dmit-node-config/releases/tag/v0.6.0)。
+当前版本：[v0.6.0](https://github.com/reina0721/dmit-node-config/releases/tag/v0.6.0)。
 
 v0.6.0 新增 DMIT 单机 Web 管理后台：复用 console-web 设计系统与插件架构，静态前端 + Rust API + 独立 Nginx HTTPS，默认保护现有 DMIT 配置。详见 [后台架构与安装](docs/web-admin-design.md)、[实施验收记录](docs/defect/13-web-admin-acceptance.md)。
 
@@ -14,7 +14,7 @@ v0.6.0 新增 DMIT 单机 Web 管理后台：复用 console-web 设计系统与�
 curl -fL --proto '=https' --proto-redir '=https' \
   --connect-timeout 20 --max-time 1800 \
   -o dmitserverconfig-setup.sh \
-  https://raw.githubusercontent.com/i0721/dmit-node-config/main/install.sh &&
+  https://raw.githubusercontent.com/reina0721/dmit-node-config/main/install.sh &&
 bash dmitserverconfig-setup.sh
 ```
 

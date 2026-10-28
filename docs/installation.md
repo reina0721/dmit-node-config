@@ -31,8 +31,8 @@ sudo sh dmitserverconfig-setup.sh --install-only --version v0.5.1 --execute
 
 ## 发布与源码
 
-两个架构均以 Debian 12 glibc 基线原生构建。归档包括程序、许可、依赖许可、CycloneDX SBOM 和构建信息；Release 包含清单、Sigstore bundle、安装器及发行说明。可额外使用 `gh attestation verify <archive> --repo i0721/dmit-node-config` 检查构建证明。
+两个架构均以 Debian 12 glibc 基线原生构建。归档包括程序、许可、依赖许可、CycloneDX SBOM 和构建信息；Release 包含清单、Sigstore bundle、安装器及发行说明。可额外使用 `gh attestation verify <archive> --repo reina0721/dmit-node-config` 检查构建证明。
 
-正式版本来自 [GitHub Releases](https://github.com/i0721/dmit-node-config/releases)。源码开发构建见 [贡献指南](../CONTRIBUTING.md)，本地候选不能冒充正式发行资产。系统矩阵与交付证据见 [验收记录](defect/08-one-command-delivery.md)。
+正式版本来自 [GitHub Releases](https://github.com/reina0721/dmit-node-config/releases)。源码开发构建见 [贡献指南](../CONTRIBUTING.md)，本地候选不能冒充正式发行资产。系统矩阵与交付证据见 [验收记录](defect/08-one-command-delivery.md)。
 
 全量质量及系统集成工作流只在手动触发时运行；标签触发的 Release 工作流仅原生构建、检查实际归档、生成 SBOM、签名及验证上传来源证明。不会为打包安装节点运行依赖；生产服务仍在目标主机原生运行。

@@ -4,7 +4,7 @@ default-run = "nodectl"
 version = "0.6.0"
 edition = "2024"
 rust-version = "1.99.1"
-repository = "https://github.com/i0721/dmit-node-config"
+repository = "https://github.com/reina0721/dmit-node-config"
 description = "Transactional configuration management for a bare-metal Xray node"
 license = "MIT"
 

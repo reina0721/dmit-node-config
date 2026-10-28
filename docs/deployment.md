@@ -328,7 +328,7 @@ find src templates config schemas -type f -print0 | sort -z | xargs -0 sha256sum
   > /root/dmit-install-records/nodectl-source-files.sha256
 ```
 
-仓库地址为 [i0721/dmit-node-config](https://github.com/i0721/dmit-node-config)。归档当前版本的源代码/补丁和 `nodectl` 二进制；恢复旧快照要求生成它的工具版本。
+仓库地址为 [reina0721/dmit-node-config](https://github.com/reina0721/dmit-node-config)。归档当前版本的源代码/补丁和 `nodectl` 二进制；恢复旧快照要求生成它的工具版本。
 
 ### 4.6 防火墙和网络方向
 
