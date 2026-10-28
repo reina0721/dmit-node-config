@@ -4,8 +4,6 @@ set -eu
 umask 077
 VERSION= PREFIX=/usr/local EXECUTE=no MODE=wizard BUNDLE_DIR= CONFIG_DIR=/etc/dmit-node STATE_DIR=/var/lib/dmit-node TOKEN_FILE= WITH_ADMIN=no
 REPOSITORY=reina0721/dmit-node-config
-LEGACY_REPOSITORY=i0721/dmit-node-config
-LEGACY_MAX=v0.6.0
 usage() { printf '%s\n' 'Usage: bash install.sh [--version vX.Y.Z] [--install-only --execute | --dry-run] [--with-admin] [--prefix /usr/local] [--bundle-dir PATH] [--config-dir PATH] [--state-dir PATH]' 'No action flag: install a verified stable release and run the complete interactive deployment wizard.' 'Legacy --execute/--dry-run explicitly select tool-only installation.' '--with-admin installs the signed static WebUI with separate HTTPS on 9443 after a valid node deployment (v0.6.0+).'; }
 die() { printf 'install: %s\n' "$*" >&2; exit 1; }
 while [ "$#" -gt 0 ]; do
@@ -44,11 +42,7 @@ fi
 if [ -z "$VERSION" ]; then
   [ -z "$BUNDLE_DIR" ] || die 'Offline installation requires --version'
   effective=$(curl --disable --proto '=https' --proto-redir '=https' --tlsv1.2 --fail --location --silent --show-error --connect-timeout 20 --max-time 1800 -o /dev/null -w '%{url_effective}' "https://github.com/$REPOSITORY/releases/latest")
-  # GitHub redirects the pre-rename owner to the current one; both point at this repository.
-  case "$effective" in
-    "https://github.com/$REPOSITORY/releases/tag/"*|"https://github.com/$LEGACY_REPOSITORY/releases/tag/"*) VERSION=${effective##*/};;
-    *) die 'Unexpected latest-release redirect';;
-  esac
+  case "$effective" in "https://github.com/$REPOSITORY/releases/tag/"*) VERSION=${effective##*/};; *) die 'Unexpected latest-release redirect';; esac
 fi
 printf '%s\n' "$VERSION" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$' || die 'Specify an exact stable version: --version vX.Y.Z'
 if [ "$WITH_ADMIN" = yes ]; then
@@ -66,17 +60,7 @@ for value in "$PREFIX" "$CONFIG_DIR" "$STATE_DIR"; do
 done
 ASSET="nodectl-${VERSION}-${ARCH}-unknown-linux-gnu.tar.gz"
 IDENTITY="https://github.com/$REPOSITORY/.github/workflows/release.yml@refs/tags/$VERSION"
-# Releases up to LEGACY_MAX were signed before the owner rename, so their OIDC
-# certificate identity still names the legacy owner. Accept that identity only
-# for those tags; every newer tag must match the current repository identity.
-version_le() { printf '%s\n%s\n' "${1#v}" "${2#v}" | awk -F. 'NR==1{a=$1*1000000+$2*1000+$3} NR==2{exit !(a <= $1*1000000+$2*1000+$3)}'; }
-IDENTITIES=$IDENTITY
-if version_le "$VERSION" "$LEGACY_MAX"; then
-  LEGACY_IDENTITY="https://github.com/$LEGACY_REPOSITORY/.github/workflows/release.yml@refs/tags/$VERSION"
-  IDENTITIES="$IDENTITY $LEGACY_IDENTITY"
-fi
 printf 'Version: %s\nArchitecture: %s\nAsset: %s\nInstall: %s/bin/nodectl\nTrust: %s (GitHub OIDC)\n' "$VERSION" "$ARCH" "$ASSET" "$PREFIX" "$IDENTITY"
-[ -z "${LEGACY_IDENTITY:-}" ] || printf 'Pre-rename signer also accepted for this tag: %s\n' "$LEGACY_IDENTITY"
 [ "$EXECUTE" = yes ] || { printf '%s\n' 'Preview only; rerun with --execute. No files or downloads changed.'; exit 0; }
 for tool in curl sha256sum tar mktemp install flock sync od tr; do command -v "$tool" >/dev/null 2>&1 || die "Missing $tool; see docs/installation.md"; done
 [ ! -e "$STATE_DIR/deployment.json" ] && [ ! -e "$STATE_DIR/transaction.json" ] && [ ! -e "$STATE_DIR/uninstall.json" ] || die 'Recover the interrupted lifecycle transaction before installing/upgrading'
@@ -127,11 +111,7 @@ get_asset() {
 }
 get_asset SHA256SUMS
 get_asset SHA256SUMS.sigstore.json
-verified=no
-for identity in $IDENTITIES; do
-  if "$COSIGN" verify-blob --bundle "$work/SHA256SUMS.sigstore.json" --certificate-identity "$identity" --certificate-oidc-issuer https://token.actions.githubusercontent.com "$work/SHA256SUMS" >/dev/null 2>&1; then verified=yes; break; fi
-done
-[ "$verified" = yes ] || die 'Release signature or workflow identity verification failed'
+"$COSIGN" verify-blob --bundle "$work/SHA256SUMS.sigstore.json" --certificate-identity "$IDENTITY" --certificate-oidc-issuer https://token.actions.githubusercontent.com "$work/SHA256SUMS" >/dev/null 2>&1 || die 'Release signature or workflow identity verification failed'
 get_asset "$ASSET"
 expected=$(awk -v name="$ASSET" '$2 == name { print $1 }' "$work/SHA256SUMS")
 [ "${#expected}" = 64 ] || die 'Missing or ambiguous asset digest'
