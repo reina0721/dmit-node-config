@@ -106,8 +106,21 @@ pub(crate) fn inherit_lease(command: &mut Command) {
 }
 
 pub(crate) fn long_command(binary: &str, args: &[&str], env: &[(&str, &str)]) -> Result<()> {
+    long_command_in(binary, args, env, None, &[0])
+}
+
+pub(crate) fn long_command_in(
+    binary: &str,
+    args: &[&str],
+    env: &[(&str, &str)],
+    dir: Option<&Path>,
+    allowed_exit_codes: &[i32],
+) -> Result<()> {
     let out = tempfile::tempfile()?;
     let mut command = Command::new(binary);
+    if let Some(dir) = dir {
+        command.current_dir(dir);
+    }
     command
         .args(args)
         .env_clear()
@@ -122,7 +135,7 @@ pub(crate) fn long_command(binary: &str, args: &[&str], env: &[(&str, &str)]) ->
         .envs(env.iter().copied())
         .stdin(Stdio::null())
         .stdout(out.try_clone()?)
-        .stderr(out);
+        .stderr(out.try_clone()?);
     #[cfg(unix)]
     {
         use std::os::unix::process::CommandExt;
@@ -135,14 +148,28 @@ pub(crate) fn long_command(binary: &str, args: &[&str], env: &[(&str, &str)]) ->
     let start = Instant::now();
     loop {
         if let Some(status) = child.try_wait()? {
+            let code = status.code().unwrap_or(-1);
+            let success = status.success() || allowed_exit_codes.contains(&code);
             #[cfg(unix)]
-            if !status.success() {
+            if !success {
                 unsafe { libc::kill(-(child.id() as i32), libc::SIGKILL) };
             }
-            ensure!(
-                status.success(),
-                "Provisioning tool failed: {binary}; private output withheld"
-            );
+            if !success {
+                use std::io::Seek;
+                let mut out_file = out;
+                let _ = out_file.seek(std::io::SeekFrom::Start(0));
+                let mut captured = String::new();
+                let _ = out_file.read_to_string(&mut captured);
+                let tail: Vec<&str> = captured.lines().rev().take(5).collect();
+                let detail = if tail.is_empty() {
+                    format!("exit code {code}")
+                } else {
+                    let mut lines = tail;
+                    lines.reverse();
+                    lines.join("; ")
+                };
+                bail!("Provisioning tool failed: {binary} ({detail})");
+            }
             return Ok(());
         }
         if start.elapsed() > Duration::from_secs(1800) {
@@ -734,10 +761,10 @@ pub fn certificates(
     if !acme.exists() {
         let source = work.join("acme-source");
         locked_source("acme", &source)?;
-        long_command(
+        long_command_in(
             "/bin/sh",
             &[
-                source.join("acme.sh").to_str().unwrap(),
+                "./acme.sh",
                 "--install",
                 "--home",
                 "/root/.acme.sh",
@@ -747,6 +774,8 @@ pub fn certificates(
                 "--noprofile",
             ],
             &[],
+            Some(&source),
+            &[0],
         )?;
     }
     for (is_ip, dir) in [(false, &c.tls.domain_cert_dir), (true, &c.tls.ip_cert_dir)] {
@@ -855,7 +884,7 @@ pub fn certificates(
                 *arg = keylength.as_str();
             }
         }
-        long_command(acme.to_str().unwrap(), &issue, &env)?;
+        long_command_in(acme.to_str().unwrap(), &issue, &env, None, &[0, 2])?;
         if kind == "domain"
             && let Some(old) = superseded
         {

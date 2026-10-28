@@ -2,7 +2,9 @@
 
 一条命令，在 Debian / Ubuntu 上交互部署 Nginx、Xray Core 和可选 WARP。已有部署也使用同一入口更新，优先保留配置和密钥。服务原生运行，由 systemd 管理。
 
-当前版本：[v0.6.3](https://github.com/reina0721/dmit-node-config/releases/tag/v0.6.3)。
+当前版本：[v0.6.4](https://github.com/reina0721/dmit-node-config/releases/tag/v0.6.4)。
+
+v0.6.4 修复 `acme.sh` 安装时因工作目录不匹配导致的安装失败，支持目标证书已存在未过期时直接复用（接受 exit code 2 `RENEW_SKIP`），并提供清晰的 provisioning 错误回显。
 
 v0.6.3 修正上游 Xray-core 官方依赖锁定版本为实际存在的最新版 `v26.10.21`（原 26.10.10 不存在导致 404 下载中断），优化制品下载的重定向容错与错误回显。
 
