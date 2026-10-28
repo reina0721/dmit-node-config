@@ -2,7 +2,9 @@
 
 一条命令，在 Debian / Ubuntu 上交互部署 Nginx、Xray Core 和可选 WARP。已有部署也使用同一入口更新，优先保留配置和密钥。服务原生运行，由 systemd 管理。
 
-当前版本：[v0.6.0](https://github.com/reina0721/dmit-node-config/releases/tag/v0.6.0)。
+当前版本：[v0.6.1](https://github.com/reina0721/dmit-node-config/releases/tag/v0.6.1)。
+
+v0.6.1 修复仓库所有者更名（`i0721` → `reina0721`）后安装器解析最新版本失败、一键安装直接退出的问题；签名验证仍锚定精确标签，更名前的 `i0721` 签名者只对 v0.6.0 及更早归档有效。功能与 v0.6.0 相同。
 
 v0.6.0 新增 DMIT 单机 Web 管理后台：复用 console-web 设计系统与插件架构，静态前端 + Rust API + 独立 Nginx HTTPS，默认保护现有 DMIT 配置。详见 [后台架构与安装](docs/web-admin-design.md)、[实施验收记录](docs/defect/13-web-admin-acceptance.md)。
 

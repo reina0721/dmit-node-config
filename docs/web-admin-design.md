@@ -68,7 +68,7 @@ nodectl admin install --assets /absolute/project/webui/apps/web/dist --execute
 
 安装需要已有有效节点配置和域名证书；首次节点部署继续运行原 `nodectl deploy` 向导，不会套用示例配置。默认管理地址 `https://节点域名:9443/admin/`；`--port` 可显式选择独立端口，不能占用节点或 API 监听端口。按原 VPS 端口策略允许此端口后访问。
 
-CI 在构建阶段生成静态文件、版本摘要清单和前端第三方声明，随原 Sigstore/OIDC 签名归档分发。版本发布后，`install.sh --with-admin` 在原安装/向导成功后安装后台。已有节点可用 `install.sh --version v0.6.0 --install-only --execute --with-admin`。当前工作区 v0.6.0 尚未发布，不能将这些命令当作已有线上发行。
+CI 在构建阶段生成静态文件、版本摘要清单和前端第三方声明，随原 Sigstore/OIDC 签名归档分发。版本发布后，`install.sh --with-admin` 在原安装/向导成功后安装后台。已有节点可用 `install.sh --version v0.6.1 --install-only --execute --with-admin`。v0.6.0 与 v0.6.1 已正式发行，这些命令可直接使用。
 
 已验证签名的本地发行归档也可执行 `nodectl admin install --archive /absolute/nodectl-v0.6.0-ARCH-unknown-linux-gnu.tar.gz --execute`。Rust 只把经过摘要、路径与大小检查的选定静态成员复制进新版本目录，不以 root 展开任意归档路径；UI 与当前 CLI 的版本不一致会拒绝。手动 `--archive` 不替代官方签名验证。
 
