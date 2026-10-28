@@ -75,6 +75,7 @@ pub fn run(store: &Store, setup: Setup) -> Result<()> {
     )?;
     c.node.ipv4 = answer(setup.ipv4, "ipv4", setup.non_interactive)?;
     c.node.ipv6 = setup.ipv6;
+    c.canonicalize_ips();
     c.node.aliases = setup.aliases;
     c.tls.domain_cert_dir = setup.domain_cert_dir;
     c.tls.ip_cert_dir = setup.ip_cert_dir;

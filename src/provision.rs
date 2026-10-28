@@ -633,6 +633,8 @@ fn challenge(mut socket: TcpStream, root: &Path) -> Result<()> {
         .as_bytes(),
     )?;
     socket.write_all(&data)?;
+    let _ = socket.flush();
+    let _ = socket.shutdown(std::net::Shutdown::Both);
     Ok(())
 }
 fn bootstrap(c: &Config) -> Result<Option<Bootstrap>> {
@@ -674,6 +676,28 @@ fn ipv6_listener(port: u16) -> Result<TcpListener> {
     ensure!(fd >= 0, "Cannot create IPv6 ACME socket");
     let fd = unsafe { OwnedFd::from_raw_fd(fd) };
     let enabled: libc::c_int = 1;
+    ensure!(
+        unsafe {
+            libc::setsockopt(
+                fd.as_raw_fd(),
+                libc::SOL_SOCKET,
+                libc::SO_REUSEADDR,
+                &enabled as *const _ as *const libc::c_void,
+                std::mem::size_of_val(&enabled) as libc::socklen_t,
+            )
+        } == 0,
+        "Cannot set SO_REUSEADDR on IPv6 ACME socket"
+    );
+    #[cfg(target_os = "linux")]
+    unsafe {
+        libc::setsockopt(
+            fd.as_raw_fd(),
+            libc::SOL_SOCKET,
+            libc::SO_REUSEPORT,
+            &enabled as *const _ as *const libc::c_void,
+            std::mem::size_of_val(&enabled) as libc::socklen_t,
+        );
+    }
     ensure!(
         unsafe {
             libc::setsockopt(
@@ -809,7 +833,7 @@ pub fn certificates(
         !needs_ip || c.ports.http == 80,
         "Automatic IP HTTP-01 renewal requires HTTP port 80; use manual certificates with an explicitly managed public challenge mapping for custom ports"
     );
-    let _bootstrap = if needs_ip { bootstrap(c)? } else { None };
+    let mut bootstrap_server = if needs_ip { bootstrap(c)? } else { None };
     if needs_ip {
         let webroot = Path::new("/var/www/acme/.well-known/acme-challenge");
         fs::create_dir_all(webroot)?;
@@ -905,7 +929,11 @@ pub fn certificates(
         let mut prepare_install = install[..reload].to_vec();
         prepare_install.extend(["--reloadcmd", "true"]);
         long_command(acme.to_str().unwrap(), &prepare_install, &env)?;
+        if kind == "ip" {
+            drop(bootstrap_server.take());
+        }
     }
+    drop(bootstrap_server.take());
     host::certificates(c)?;
     Ok(())
 }

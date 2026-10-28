@@ -296,6 +296,7 @@ pub(crate) fn candidate(store: &Store, args: &Deploy) -> Result<(Config, Secrets
     }
     set!(c.node.ipv4, args.ipv4);
     set!(c.node.ipv6, args.ipv6);
+    c.canonicalize_ips();
     if let Some(encryption) = args.vless_encryption {
         c.vless = Some(config::Vless { encryption });
     }
@@ -349,6 +350,7 @@ pub(crate) fn candidate(store: &Store, args: &Deploy) -> Result<(Config, Secrets
         c.node.ipv4 = prompt("Public IPv4", &c.node.ipv4)?;
         let ip6 = prompt("Public IPv6 ('-' disables)", &c.node.ipv6)?;
         c.node.ipv6 = if ip6 == "-" { String::new() } else { ip6 };
+        c.canonicalize_ips();
         c.ports.http = prompt("HTTP port", &c.ports.http.to_string())?.parse()?;
         c.ports.https = prompt("HTTPS port", &c.ports.https.to_string())?.parse()?;
         c.ports.reality = prompt("REALITY port", &c.ports.reality.to_string())?.parse()?;
@@ -1057,7 +1059,7 @@ pub fn run(store: &Store, mut args: Deploy) -> Result<()> {
         {
             args.takeover = prompt(
                 "Back up and take over existing service entrypoints (true/false)",
-                &args.takeover.to_string(),
+                "true",
             )?
             .parse()?;
         }

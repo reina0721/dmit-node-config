@@ -282,10 +282,24 @@ impl Config {
         names.dedup();
         names
     }
+    pub fn canonicalize_ips(&mut self) {
+        if let Ok(ip) = self.node.ipv4.parse::<Ipv4Addr>() {
+            self.node.ipv4 = ip.to_string();
+        }
+        if let Ok(ip) = self.node.ipv6.parse::<Ipv6Addr>() {
+            self.node.ipv6 = ip.to_string();
+        }
+    }
     pub fn ips(&self) -> Vec<String> {
         let mut ips = vec![self.node.ipv4.clone()];
         if !self.node.ipv6.is_empty() {
-            ips.push(self.node.ipv6.clone());
+            let canon = self
+                .node
+                .ipv6
+                .parse::<Ipv6Addr>()
+                .map(|ip| ip.to_string())
+                .unwrap_or_else(|_| self.node.ipv6.clone());
+            ips.push(canon);
         }
         ips
     }

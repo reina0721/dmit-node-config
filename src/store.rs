@@ -226,7 +226,7 @@ impl Store {
                     || v2
                     || v3
                     || (manifest.template_version == render::TEMPLATE_VERSION
-                        && ["0.5.0", "0.5.1", "0.6.0", "0.6.1", "0.6.2", "0.6.3", "0.6.4"]
+                        && ["0.5.0", "0.5.1", "0.6.0", "0.6.1", "0.6.2", "0.6.3", "0.6.4", "0.6.5"]
                             .contains(&manifest.generator_version.as_str()))),
             "Release requires its original nodectl/template version"
         );

@@ -2,7 +2,9 @@
 
 一条命令，在 Debian / Ubuntu 上交互部署 Nginx、Xray Core 和可选 WARP。已有部署也使用同一入口更新，优先保留配置和密钥。服务原生运行，由 systemd 管理。
 
-当前版本：[v0.6.4](https://github.com/reina0721/dmit-node-config/releases/tag/v0.6.4)。
+当前版本：[v0.6.5](https://github.com/reina0721/dmit-node-config/releases/tag/v0.6.5)。
+
+v0.6.5 修复 ACME 验证时 IPv6 Socket 端口复用（添加 `SO_REUSEADDR`/`SO_REUSEPORT` 避免 Nginx 启动时报 `[::]:80 Address already in use`），支持规范化 IPv6（RFC 5952）输入，优化 ACME 端口释放生命周期与服务回滚健壮性。
 
 v0.6.4 修复 `acme.sh` 安装时因工作目录不匹配导致的安装失败，支持目标证书已存在未过期时直接复用（接受 exit code 2 `RENEW_SKIP`），并提供清晰的 provisioning 错误回显。
 

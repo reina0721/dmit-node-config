@@ -995,12 +995,13 @@ fn extend_installation(store: &Store, tx: &Transaction) -> Result<()> {
 }
 
 fn restore_sharing(sharing: &Sharing) -> Result<()> {
-    let current = service_state(SHARE_SERVICE)?;
-    if current.active {
-        command("systemctl", &["stop", SHARE_SERVICE])?;
-    }
-    if current.enabled.starts_with("enabled") {
-        command("systemctl", &["disable", SHARE_SERVICE])?;
+    if let Ok(current) = service_state(SHARE_SERVICE) {
+        if current.active {
+            let _ = command("systemctl", &["stop", SHARE_SERVICE]);
+        }
+        if current.enabled.starts_with("enabled") {
+            let _ = command("systemctl", &["disable", SHARE_SERVICE]);
+        }
     }
     restore_entry(Path::new(SHARE_ENTRY), &sharing.entry)?;
     command("systemctl", &["daemon-reload"])?;
@@ -1232,11 +1233,21 @@ pub(crate) fn service_state(name: &str) -> Result<Service> {
             "disabled",
             "linked",
             "static",
+            "bad",
+            "masked",
+            "masked-runtime",
+            "transient",
+            "indirect",
             ""
         ]
         .contains(&enabled.as_str()),
         "Unsupported existing service enable state for {name}; preserve it explicitly before takeover"
     );
+    let enabled = if enabled == "bad" {
+        "disabled".to_owned()
+    } else {
+        enabled
+    };
     let active = command("systemctl", &["show", name, "-p", "ActiveState", "--value"])?;
     ensure!(
         ["active", "inactive", "failed"].contains(&active.trim()),
